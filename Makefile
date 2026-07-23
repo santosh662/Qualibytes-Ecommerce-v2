@@ -13,25 +13,29 @@ help:
 	@echo "make deploy     - Deploy application"
 	@echo "make clean      - Cleanup docker"
 
+bootstrap:
+	bash automation/bootstrap.sh
+
+
 doctor:
 	bash automation/check-prerequisites.sh
 
 start:
-    bash automation/check-prerequisites.sh
-    bash kind/create-cluster.sh
-    bash kind/install-addons.sh
-    bash automation/build-images.sh
-    bash automation/load-images.sh
-    bash automation/deploy-kind.sh
-    bash automation/deploy-monitoring.sh
-    bash automation/install-argocd.sh
-    bash automation/health-check.sh
+	bash automation/check-prerequisites.sh
+	bash automation/create-cluster.sh
+	bash kind/install-addons.sh
+	bash automation/build-images.sh
+	bash automation/load-images.sh
+	bash automation/deploy-kind.sh
+	bash automation/deploy-monitoring.sh
+	bash automation/install-argocd.sh
+	bash automation/health-check.sh
 
 stop:
-    bash automation/remove-argocd.sh
-    bash automation/delete-monitoring.sh
-    bash automation/destroy-kind.sh
-    bash kind/delete-cluster.sh
+	bash automation/remove-argocd.sh
+	bash automation/delete-monitoring.sh
+	bash automation/destroy-kind.sh
+	bash automation/delete-cluster.sh
 restart: stop start
 
 status:
