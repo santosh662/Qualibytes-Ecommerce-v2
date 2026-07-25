@@ -8,8 +8,8 @@ spec:
     spec:
       containers:
       - name: qbs-migration
-        image: mrsinghdev/qbshop-app:latest
-        imagePullPolicy: Always
+        image: qualibytes-shop-migration:local
+        imagePullPolicy: IfNotPresent
         env:
         - name: MONGODB_URI
           value: "mongodb://mongodb-service:27017/easyshop"
