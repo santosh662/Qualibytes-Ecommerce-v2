@@ -1,15 +1,31 @@
 #!/usr/bin/env bash
 
-set -e
+source automation/versions.sh
+
+set -euo pipefail
+
+echo "========================================"
+echo " Installing Monitoring Stack"
+echo "========================================"
+
+
+echo "Installing Helm Charts..."
 
 bash monitoring/helm/install.sh
 
-kubectl apply -f monitoring/
 
-echo "Waiting..."
+echo "Applying Monitoring Manifests..."
 
-sleep 20
+kubectl apply -k monitoring/
+
+
+echo "Waiting for Monitoring Pods..."
+
+sleep 30
+
 
 kubectl get pods -n monitoring
 
-echo "Monitoring Ready"
+
+echo ""
+echo "Monitoring Installed Successfully"

@@ -1,25 +1,101 @@
 #!/usr/bin/env bash
 
-set -e
+###############################################################################
+# Qualibytes Automation Framework v2
+# Install ArgoCD
+###############################################################################
 
-kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+set -Eeuo pipefail
 
-kubectl apply \
--n argocd \
--f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo ""
+source "${SCRIPT_DIR}/common.sh"
 
-echo "Waiting ArgoCD..."
+banner "Installing ArgoCD"
 
-kubectl wait \
---for=condition=Available \
-deployment/argocd-server \
--n argocd \
---timeout=600s
+ARGO_NAMESPACE="argocd"
+ARGO_APP="${PROJECT_ROOT}/kubernetes/argocd/application.yaml"
 
-kubectl apply -f kubernetes/argocd/application.yaml
+###############################################################################
+# Create Namespace
+###############################################################################
 
-echo ""
+if namespace_exists "${ARGO_NAMESPACE}"
+then
+    success "ArgoCD namespace already exists."
+else
+    info "Creating ArgoCD namespace..."
 
-echo "ArgoCD Installed"
+    kubectl create namespace "${ARGO_NAMESPACE}"
+
+    success "Namespace created."
+fi
+
+###############################################################################
+# Install ArgoCD
+###############################################################################
+
+line
+
+if deployment_exists "${ARGO_NAMESPACE}" "argocd-server"
+then
+
+    success "ArgoCD already installed."
+
+else
+
+    info "Installing ArgoCD..."
+    retry 3 kubectl apply \
+        --server-side \
+        --force-conflicts \
+        -n "${ARGO_NAMESPACE}" \
+        -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+fi
+
+###############################################################################
+# Wait
+###############################################################################
+
+line
+
+info "Waiting for ArgoCD Server..."
+
+wait_deployment "${ARGO_NAMESPACE}" "argocd-server"
+
+success "ArgoCD Server Ready."
+
+###############################################################################
+# Deploy Application
+###############################################################################
+
+line
+
+if [[ -f "${ARGO_APP}" ]]
+then
+
+    info "Deploying ArgoCD Application..."
+
+    retry 3 kubectl apply -f "${ARGO_APP}"
+
+    success "Application Registered."
+
+else
+
+    warning "Application manifest not found."
+
+fi
+
+###############################################################################
+# Display Resources
+###############################################################################
+
+line
+
+kubectl get pods -n "${ARGO_NAMESPACE}"
+
+###############################################################################
+# Finish
+###############################################################################
+
+completed "ArgoCD Installation Completed."

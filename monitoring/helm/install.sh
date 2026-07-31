@@ -1,27 +1,64 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
+source automation/versions.sh
+
+echo "======================================"
+echo " Installing Monitoring Stack"
+echo "======================================"
+
+# Create Namespace
 kubectl apply -f monitoring/namespace.yaml
 
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+# Add Helm Repositories
+echo "Adding Helm Repositories..."
 
-helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo add grafana https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
 
+echo "Updating Helm Repositories..."
 helm repo update
 
-echo "Installing kube-prometheus-stack..."
+########################################
+# Install Prometheus Stack
+########################################
+
+echo "Installing Prometheus..."
 
 helm upgrade --install prometheus \
-prometheus-community/kube-prometheus-stack \
--n monitoring \
--f monitoring/helm/prometheus-values.yaml
+  prometheus-community/kube-prometheus-stack \
+  --version ${PROMETHEUS_CHART_VERSION} \
+  -n monitoring \
+  --create-namespace \
+  -f monitoring/helm/prometheus-values.yaml \
+  --wait
+
+########################################
+# Install Loki
+########################################
 
 echo "Installing Loki..."
 
 helm upgrade --install loki \
-grafana/loki-stack \
--n monitoring \
--f monitoring/helm/loki-values.yaml
+  grafana/loki \
+  --version ${LOKI_CHART_VERSION} \
+  -n monitoring \
+  -f monitoring/helm/loki-values.yaml \
+  --wait
 
-echo "Monitoring Installed."
+
+###########################################
+# Install promtail
+# #########################################
+helm upgrade --install promtail \
+  grafana/promtail \
+  --version ${PROMTAIL_CHART_VERSION} \
+  -n monitoring \
+  -f monitoring/helm/promtail-values.yaml \
+  --wait
+
+echo ""
+echo "======================================"
+echo " Monitoring Installed Successfully"
+echo "======================================"

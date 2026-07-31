@@ -1,24 +1,76 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+###############################################################################
+# Qualibytes Automation Framework v2
+# Build Docker Images
+###############################################################################
 
-echo "======================================"
-echo "Building Docker Images"
-echo "======================================"
+set -Eeuo pipefail
 
-echo ""
-echo "Building Application Image..."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-docker build \
--t qualibytes-shop-app:local \
--f Dockerfile .
+source "${SCRIPT_DIR}/common.sh"
 
-echo ""
-echo "Building Migration Image..."
+banner "Building Docker Images"
 
-docker build \
--t qualibytes-shop-migration:local \
--f scripts/Dockerfile.migration .
+APP_IMAGE="qualibytes-shop-app:local"
+MIGRATION_IMAGE="qualibytes-shop-migration:local"
 
-echo ""
-echo "Docker Images Built Successfully"
+cd "${PROJECT_ROOT}"
+
+###############################################################################
+# Application Image
+###############################################################################
+
+line
+
+info "Building Application Image..."
+
+retry 2 docker build \
+    -t "${APP_IMAGE}" \
+    -f Dockerfile .
+
+success "Application Image Built."
+
+###############################################################################
+# Migration Image
+###############################################################################
+
+line
+
+info "Building Migration Image..."
+
+retry 2 docker build \
+    -t "${MIGRATION_IMAGE}" \
+    -f scripts/Dockerfile.migration .
+
+success "Migration Image Built."
+
+###############################################################################
+# Verification
+###############################################################################
+
+line
+
+info "Verifying Docker Images..."
+
+docker image inspect "${APP_IMAGE}" >/dev/null
+
+docker image inspect "${MIGRATION_IMAGE}" >/dev/null
+
+success "Docker Images Verified."
+
+###############################################################################
+# Show Images
+###############################################################################
+
+line
+
+docker images | grep "qualibytes-shop"
+
+###############################################################################
+# Finish
+###############################################################################
+
+completed "Docker Image Build Completed."

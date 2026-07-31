@@ -1,111 +1,301 @@
 #!/usr/bin/env bash
 
-set -e
+###############################################################################
+# Qualibytes Bootstrap
+# Installs all required dependencies for local Kubernetes development.
+###############################################################################
 
-echo "======================================"
-echo " Qualibytes Bootstrap"
-echo "======================================"
+set -Eeuo pipefail
 
-sudo apt-get update
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "Installing packages..."
+###############################################################################
+# Colors
+###############################################################################
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+###############################################################################
+# Logging Helpers
+###############################################################################
+
+log() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+warn() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+trap 'error "Bootstrap failed at line $LINENO"' ERR
+
+###############################################################################
+# Banner
+###############################################################################
+
+echo
+echo "====================================================="
+echo "          Qualibytes Bootstrap"
+echo "====================================================="
+echo
+
+###############################################################################
+# Root Check
+###############################################################################
+
+if [[ $EUID -eq 0 ]]; then
+    error "Run this script as normal user."
+    exit 1
+fi
+
+###############################################################################
+# Ubuntu Check
+###############################################################################
+
+if ! grep -qi ubuntu /etc/os-release; then
+    error "Only Ubuntu is officially supported."
+    exit 1
+fi
+
+###############################################################################
+# Update Packages
+###############################################################################
+
+log "Updating package repositories..."
+
+sudo apt-get update -y
+
+###############################################################################
+# Install Required Packages
+###############################################################################
+
+log "Installing required packages..."
+
 sudo apt-get install -y \
-    curl \
-    wget \
-    git \
-    unzip \
-    jq \
-    make \
-    apt-transport-https \
-    ca-certificates \
-    gnupg \
-    lsb-release
+curl \
+wget \
+git \
+jq \
+make \
+unzip \
+tar \
+vim \
+net-tools \
+ca-certificates \
+apt-transport-https \
+gnupg \
+lsb-release
 
-##############################################
-# Docker
-##############################################
+success "Required packages installed."
 
-if ! command -v docker >/dev/null 2>&1; then
-    echo "Installing Docker..."
+###############################################################################
+# Docker Installation
+###############################################################################
+
+if command -v docker >/dev/null 2>&1
+then
+    success "Docker already installed."
+else
+
+    log "Installing Docker..."
 
     curl -fsSL https://get.docker.com | sudo sh
 
     sudo systemctl enable docker
+
     sudo systemctl start docker
 
-    sudo usermod -aG docker $USER
-else
-    echo "Docker already installed"
+    success "Docker Installed."
+
 fi
 
-##############################################
-# kubectl
-##############################################
+###############################################################################
+# Start Docker
+###############################################################################
 
-if ! command -v kubectl >/dev/null 2>&1; then
-    echo "Installing kubectl..."
+sudo systemctl enable docker
 
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo systemctl start docker
 
-    chmod +x kubectl
+###############################################################################
+# Docker Group
+###############################################################################
 
-    sudo mv kubectl /usr/local/bin/
+if groups "$USER" | grep -qw docker
+then
+    success "User already belongs to docker group."
 else
-    echo "kubectl already installed"
+
+    log "Adding $USER to docker group..."
+
+    sudo usermod -aG docker "$USER"
+
+    warn "Docker group added."
+
+    warn "You must logout/login once."
+
 fi
 
-##############################################
-# Kind
-##############################################
+###############################################################################
+# Verify Docker Service
+###############################################################################
 
-if ! command -v kind >/dev/null 2>&1; then
-    echo "Installing Kind..."
-
-    curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
-
-    chmod +x kind
-
-    sudo mv kind /usr/local/bin/
+if sudo systemctl is-active docker >/dev/null
+then
+    success "Docker Service Running."
 else
-    echo "Kind already installed"
+    error "Docker Service Failed."
+    exit 1
+fi
+###############################################################################
+# kubectl Installation
+###############################################################################
+
+if command -v kubectl >/dev/null 2>&1
+then
+    success "kubectl already installed."
+else
+
+    log "Installing kubectl..."
+
+    KUBECTL_VERSION="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
+
+    curl -fsSL \
+        "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+        -o /tmp/kubectl
+
+    chmod +x /tmp/kubectl
+
+    sudo install -m 755 /tmp/kubectl /usr/local/bin/kubectl
+
+    rm -f /tmp/kubectl
+
+    success "kubectl installed."
+
 fi
 
-##############################################
-# Helm
-##############################################
+###############################################################################
+# Kind Installation
+###############################################################################
 
-if ! command -v helm >/dev/null 2>&1; then
-    echo "Installing Helm..."
-
-    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+if command -v kind >/dev/null 2>&1
+then
+    success "Kind already installed."
 else
-    echo "Helm already installed"
+
+    log "Installing Kind..."
+
+    curl -fsSL \
+        https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 \
+        -o /tmp/kind
+
+    chmod +x /tmp/kind
+
+    sudo install -m 755 /tmp/kind /usr/local/bin/kind
+
+    rm -f /tmp/kind
+
+    success "Kind installed."
+
 fi
 
-##############################################
-# Verify
-##############################################
+###############################################################################
+# Helm Installation
+###############################################################################
 
-echo ""
-echo "========== Installed Versions =========="
+if command -v helm >/dev/null 2>&1
+then
+    success "Helm already installed."
+else
 
-docker --version
+    log "Installing Helm..."
+
+    curl -fsSL \
+        https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
+        | bash
+
+    success "Helm installed."
+
+fi
+
+###############################################################################
+# Git Verification
+###############################################################################
+
+if command -v git >/dev/null 2>&1
+then
+    success "Git installed."
+else
+    error "Git installation failed."
+    exit 1
+fi
+
+###############################################################################
+# Verify Installed Versions
+###############################################################################
+
+echo
+echo "====================================================="
+echo "Installed Versions"
+echo "====================================================="
+
+docker --version || true
+
 kubectl version --client
+
 kind --version
+
 helm version --short
+
 git --version
+
 make --version
 
-echo ""
-echo "======================================"
-echo " Bootstrap Completed"
-echo " Please logout/login once"
-echo " OR run:"
-echo ""
-echo " newgrp docker"
-echo ""
-echo "Then execute:"
-echo ""
-echo " make start"
-echo "======================================"
+echo
+success "All required tools are available."
 
+###############################################################################
+# Docker Permission Check
+###############################################################################
+
+echo
+
+if docker info >/dev/null 2>&1
+then
+
+    success "Docker permission verified."
+
+    echo
+    success "Bootstrap completed successfully."
+    echo
+    echo "Run:"
+    echo
+    echo "    make start"
+    echo
+
+else
+
+    warn "Docker group has been configured."
+
+    echo
+    warn "Logout/Login (or run newgrp docker)"
+    warn "Then execute:"
+    echo
+    echo "    make start"
+    echo
+
+fi
+
+echo "====================================================="
