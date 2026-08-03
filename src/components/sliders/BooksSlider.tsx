@@ -31,7 +31,7 @@ const BooksSlider = ({ books }: BookSliderProps) => {
             className="basis-1/2 sm:basis-1/3 md:basis-1/5 lg:basis-1/6"
             key={index}
           >
-            <Link href={`/products/${book._id}`}>
+            <Link href={`/products/${book.originalId}`}>
               <Image
                 width={400}
                 height={600}

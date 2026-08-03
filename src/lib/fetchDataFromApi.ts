@@ -1,9 +1,21 @@
 import axios from "axios";
 
 // Get the base URL from environment or use window.location.origin in the browser
-const baseURL = typeof window !== 'undefined' 
-  ? `${window.location.origin}/api`
-  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api');
+// Server-side: use internal URL (app is running on localhost inside the same pod)
+// Client-side (browser): use the actual public origin
+const baseURL =
+  typeof window !== "undefined"
+    ? "/api"
+    : "http://qbshop-service/api";
+// Safely get token from cookie - works both on server and client
+const getTokenFromCookie = (): string | null => {
+  if (typeof document === 'undefined') {
+    return null; // Server-side: no cookies accessible this way
+  }
+  const cookies = document.cookie.split(';');
+  const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('token='));
+  return tokenCookie ? decodeURIComponent(tokenCookie.split('=')[1].trim()) : null;
+};
 
 // Add request interceptor to include token
 export const axiosInstance = axios.create({
@@ -17,12 +29,8 @@ export const axiosInstance = axios.create({
 // Add request interceptor to include token from cookie
 axiosInstance.interceptors.request.use(
   async (config) => {
-    // Get token from cookie
-    const cookies = document.cookie.split(';');
-    const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('token='));
-    const token = tokenCookie ? tokenCookie.split('=')[1] : null;
+    const token = getTokenFromCookie();
 
-    // If token exists, add it to headers
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -37,10 +45,7 @@ axiosInstance.interceptors.request.use(
 const fetchData = {
   get: async (url: string, params = {}) => {
     try {
-      // Get token from cookie
-      const cookies = document.cookie.split(';');
-      const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('token='));
-      const token = tokenCookie ? decodeURIComponent(tokenCookie.split('=')[1].trim()) : null;
+      const token = getTokenFromCookie();
 
       const config = {
         params,
@@ -57,10 +62,7 @@ const fetchData = {
   },
   post: async (url: string, data = {}) => {
     try {
-      // Get token from cookie
-      const cookies = document.cookie.split(';');
-      const tokenCookie = cookies.find(cookie => cookie.trim().startsWith('token='));
-      const token = tokenCookie ? decodeURIComponent(tokenCookie.split('=')[1].trim()) : null;
+      const token = getTokenFromCookie();
 
       const config = {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}

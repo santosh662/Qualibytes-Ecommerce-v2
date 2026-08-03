@@ -1,11 +1,19 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
+LOG_DIR="/tmp/qualibytes-portforward"
+
 print_header "Starting Port Forward Services"
+
+###########################################################
+# Create Log Directory
+###########################################################
+
+mkdir -p "$LOG_DIR"
 
 ###########################################################
 # Stop Old Port Forwards
@@ -20,46 +28,71 @@ sleep 2
 success "Old port forwards stopped."
 
 ###########################################################
-# ArgoCD
+# Start ArgoCD
 ###########################################################
 
 info "Starting ArgoCD..."
 
-nohup kubectl port-forward svc/argocd-server \
+nohup kubectl port-forward \
+svc/argocd-server \
 -n argocd \
 8080:443 \
 --address=0.0.0.0 \
->/tmp/qualibytes-portforward/argocd.log 2>&1 &
-
-sleep 2
+>"$LOG_DIR/argocd.log" 2>&1 &
 
 ###########################################################
-# Grafana
+# Start Grafana
 ###########################################################
 
 info "Starting Grafana..."
 
-nohup kubectl port-forward svc/prometheus-grafana \
+nohup kubectl port-forward \
+svc/prometheus-grafana \
 -n monitoring \
 3000:80 \
 --address=0.0.0.0 \
->/tmp/qualibytes-portforward/grafana.log 2>&1 &
-
-sleep 2
+>"$LOG_DIR/grafana.log" 2>&1 &
 
 ###########################################################
-# Prometheus
+# Start Prometheus
 ###########################################################
 
 info "Starting Prometheus..."
 
-nohup kubectl port-forward svc/prometheus-kube-prometheus-prometheus \
+nohup kubectl port-forward \
+svc/prometheus-kube-prometheus-prometheus \
 -n monitoring \
 9090:9090 \
 --address=0.0.0.0 \
->/tmp/qualibytes-portforward/prometheus.log 2>&1 &
+>"$LOG_DIR/prometheus.log" 2>&1 &
 
-sleep 2
+###########################################################
+# Wait
+###########################################################
+
+sleep 5
+
+###########################################################
+# Verify Port Forwards
+###########################################################
+
+FAILED=0
+
+check_pf() {
+    local NAME="$1"
+    local PATTERN="$2"
+
+    if pgrep -f "$PATTERN" >/dev/null; then
+        success "$NAME Port Forward Running"
+    else
+        error "$NAME Port Forward Failed"
+        FAILED=1
+    fi
+}
+
+check_pf "ArgoCD" "kubectl port-forward.*argocd-server"
+check_pf "Grafana" "kubectl port-forward.*prometheus-grafana"
+check_pf "Prometheus" "kubectl port-forward.*prometheus-kube-prometheus-prometheus"
 
 ###########################################################
 # Jenkins
@@ -67,33 +100,54 @@ sleep 2
 
 info "Checking Jenkins..."
 
-if systemctl is-active --quiet jenkins
-then
-    success "Jenkins already running on port 8082."
+if systemctl is-active --quiet jenkins; then
+    success "Jenkins Running"
 else
-    warning "Jenkins is not running."
+    warning "Jenkins Not Running"
 fi
 
 ###########################################################
-# Done
+# Exit if Failed
 ###########################################################
+
+if [ "$FAILED" -ne 0 ]; then
+    echo
+    error "One or more port-forwards failed."
+    echo
+    echo "Check logs:"
+    echo "------------------------------------"
+    ls -lh "$LOG_DIR"
+    echo "------------------------------------"
+    exit 1
+fi
+
+###########################################################
+# URLs
+###########################################################
+
+PUBLIC_IP=$(curl -s ifconfig.me)
 
 echo
 echo "=============================================="
-echo " All Services Available"
+echo "     Port Forward Started Successfully"
 echo "=============================================="
 echo
 echo "Jenkins"
-echo "http://$(curl -s ifconfig.me):8082"
+echo "http://$PUBLIC_IP:8082"
 echo
 echo "ArgoCD"
-echo "http://$(curl -s ifconfig.me):8080"
+echo "https://$PUBLIC_IP:8080"
 echo
 echo "Grafana"
-echo "http://$(curl -s ifconfig.me):3000"
+echo "http://$PUBLIC_IP:3000"
 echo
 echo "Prometheus"
-echo "http://$(curl -s ifconfig.me):9090"
+echo "http://$PUBLIC_IP:9090"
 echo
 echo "=============================================="
 
+###########################################################
+# Show Listening Ports
+###########################################################
+
+ss -tulnp | grep -E ':3000|:8080|:8082|:9090' || true

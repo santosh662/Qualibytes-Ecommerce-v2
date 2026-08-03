@@ -15,57 +15,70 @@ export async function generateMetadata(
   { params }: SingleProductPageProps,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  // read route params
-  const slug = params.slug;
+  try {
+    const res = await fetchData.get(`/products/${params.slug}`);
+    const product = res.data;
 
-  // fetch data
-  const res = await fetchData.get(`/singleProduct/${slug}`);
-  const product: SingleProductType | null = res.data || null;
-
-  return {
-    title: product ? product?.title : "Product Not Found",
-    description: product?.description,
-  };
+    return {
+      title: product?.title || "Product Not Found",
+      description: product?.description || "",
+    };
+  } catch {
+    return {
+      title: "Product Not Found",
+    };
+  }
 }
 
 const SingleProductPage = async ({
-  params: { slug },
+  params,
 }: SingleProductPageProps) => {
-  const res = await fetchData.get(`/singleProduct/${slug}`);
-  const product: SingleProductType | null = res.data || null;
+  let product = null;
+
+  try {
+    const res = await fetchData.get(`/products/${params.slug}`);
+    product = res.data;
+  } catch (err) {
+    console.error(err);
+  }
 
   return (
     <section className="single-product-page bg-secondary dark:bg-background">
-      {product && <SingleProduct product={product} />}
-      {!product && (
-        <div className="h-screen w-full flex justify-center items-center text-3xl font-semibold text-center">
+      {product ? (
+        <>
+          <SingleProduct product={product} />
+
+          <Suspense
+            fallback={
+              <div className="container">
+                <ProductLoader />
+              </div>
+            }
+          >
+            <div className="bg-accent pb-20 pt-10">
+              <div className="container">
+                <h1 className="mb-7 text-3xl font-semibold">
+                  You May Also Like
+                </h1>
+
+                <div className="grid-layout">
+                  {product.categories?.map((item: string) => (
+                    <RelatedProducts
+                      key={item}
+                      shop_category={product.shop_category}
+                      category={item}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </Suspense>
+        </>
+      ) : (
+        <div className="h-screen flex items-center justify-center text-3xl font-semibold">
           Product Not Found
         </div>
       )}
-
-      <Suspense
-        fallback={
-          <div className="container">
-            <ProductLoader />
-          </div>
-        }
-      >
-        <div className="bg-accent pb-20 pt-10">
-          <div className="container">
-            <h1 className="mb-7 text-3xl font-semibold">You May Also like</h1>
-            <div className="grid-layout">
-              {product &&
-                product?.categories.map((item) => (
-                  <RelatedProducts
-                    shop_category={product.shop_category}
-                    category={item}
-                    key={item}
-                  />
-                ))}
-            </div>
-          </div>
-        </div>
-      </Suspense>
     </section>
   );
 };
