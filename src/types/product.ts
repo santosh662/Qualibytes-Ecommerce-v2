@@ -86,6 +86,7 @@ export type BagsProduct = {
 
 export type BooksProduct = {
   _id: string;
+  originalId: string;   // 👈 ye line add karo
   title: string;
   description: string;
   price: number;

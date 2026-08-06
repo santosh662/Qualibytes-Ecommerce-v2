@@ -88,6 +88,7 @@ type BagsProduct = {
 
 type BooksProduct = {
   _id: string;
+  originalId: string;
   title: string;
   description: string;
   price: number;
