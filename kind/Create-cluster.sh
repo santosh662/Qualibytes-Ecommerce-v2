@@ -6,6 +6,6 @@ echo "Creating Kind Cluster..."
 
 kind create cluster \
 --name qualibytes \
---config kind/kind-config.yaml
+--config kind/kind-config.yml
 
 echo "Cluster Created."
