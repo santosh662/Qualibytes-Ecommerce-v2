@@ -39,6 +39,15 @@ info "Waiting for Ingress Controller..."
 
 wait_deployment ingress-nginx ingress-nginx-controller
 
+# Persist Kind host-port ingress configuration
+kubectl patch deployment ingress-nginx-controller \
+  -n ingress-nginx \
+  --type=strategic \
+  -p='{"spec":{"template":{"spec":{"hostNetwork":true,"dnsPolicy":"ClusterFirstWithHostNet","nodeSelector":{"kubernetes.io/hostname":"qualibytes-control-plane","kubernetes.io/os":"linux"},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}'
+
+kubectl rollout status deployment/ingress-nginx-controller \
+  -n ingress-nginx --timeout=180s
+
 success "NGINX Ingress Ready."
 
 ###############################################################################
