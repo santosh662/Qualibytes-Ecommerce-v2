@@ -35,11 +35,14 @@ spec:
                 secretKeyRef:
                   name: qbshop-secrets
                   key: NEXTAUTH_SECRET
+            
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: qbshop-secrets
                   key: JWT_SECRET
+            - name: HOSTNAME
+              value: "0.0.0.0"                 
           resources:
             requests:
               memory: "256Mi"
