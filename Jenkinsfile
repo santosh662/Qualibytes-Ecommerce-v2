@@ -25,7 +25,7 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 script {
-                    clone("https://github.com/santosh662/Qualibytes-Ecommerce.git", "dev")
+                    clone("https://github.com/santosh662/Qualibytes-Ecommerce-v2.git", "dev")
                 }
             }
         }
@@ -46,7 +46,6 @@ pipeline {
                     sh "docker container prune -f"
 
                     // Remove unused volumes (safe)
-                    sh "docker volume prune -f"
 
                     echo "Cleanup completed successfully!"
                 }
