@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: qbs-app
-          image: mrsinghdev/qbshop-app:9
+          image: mrsinghdev/qbshop-app:10
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
