@@ -1,16 +1,22 @@
-
 @Library('Shared') _
 
 pipeline {
     agent any
 
+    options {
+        skipDefaultCheckout(true)
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
     environment {
-        // Updated image names for QBShop project (DEV)
         DOCKER_IMAGE_NAME = 'mrsinghdev/qbshop-app'
         DOCKER_MIGRATION_IMAGE_NAME = 'mrsinghdev/qbshop-migration'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
-        GITHUB_CREDENTIALS = credentials('github-credentials')
-        GIT_BRANCH = "dev"
+        GIT_BRANCH = 'dev'
+
+        // Detect Jenkins-generated GitOps commits.
+        SKIP_CI_PIPELINE = 'false'
     }
 
     stages {
@@ -18,7 +24,7 @@ pipeline {
         stage('Cleanup Workspace') {
             steps {
                 script {
-                    clean_ws()
+[<0;31;38M                    clean_ws()
                 }
             }
         }
@@ -27,36 +33,51 @@ pipeline {
             steps {
                 script {
                     clone(
-                        "https://github.com/santosh662/Qualibytes-Ecommerce-v2.git",
-                        "dev"
+                        'https://github.com/santosh662/Qualibytes-Ecommerce-v2.git',
+                        'dev'
                     )
+[<0;31;38m
+                    def commitMessage = sh(
+                        script: 'git log -1 --pretty=%s',
+                        returnStdout: true
+                    ).trim()
+
+                    if (commitMessage.startsWith('ci: update image ')) {
+                        env.SKIP_CI_PIPELINE = 'true'
+                        currentBuild.description =
+                            'Skipped: Jenkins-generated GitOps commit'
+
+                        echo "GitOps commit detected: ${commitMessage}"
+                        echo 'Skipping CI/CD stages to prevent a build loop.'
+                    } else {
+                        echo "Application change detected: ${commitMessage}"
+                    }
                 }
             }
         }
 
-        // Cleanup old Docker images to avoid disk full issues
         stage('Cleanup Old Docker Images') {
+            when {
+                expression { env.SKIP_CI_PIPELINE != 'true' }
+            }
             steps {
                 script {
-                    echo "Cleaning up old Docker images, containers & volumes..."
+                    echo 'Cleaning up unused Docker resources...'
 
-                    // Remove dangling images
-                    sh "docker image prune -f"
-
-                    // Remove unused images older than 12 hours
+                    sh 'docker image prune -f'
                     sh 'docker image prune -a --force --filter "until=12h"'
+                    sh 'docker container prune -f'
 
-                    // Remove stopped containers
-                    sh "docker container prune -f"
-
-                    echo "Cleanup completed successfully!"
+                    echo 'Docker cleanup completed.'
                 }
             }
         }
 
         stage('Build Docker Images') {
+            when {
+                expression { env.SKIP_CI_PIPELINE != 'true' }
+            }
             parallel {
-
                 stage('Build Main App Image') {
                     steps {
                         script {
@@ -86,6 +107,9 @@ pipeline {
         }
 
         stage('Run Unit Tests') {
+            when {
+                expression { env.SKIP_CI_PIPELINE != 'true' }
+            }
             steps {
                 script {
                     run_tests()
@@ -94,6 +118,9 @@ pipeline {
         }
 
         stage('Security Scan with Trivy') {
+            when {
+                expression { env.SKIP_CI_PIPELINE != 'true' }
+            }
             steps {
                 script {
                     trivy_scan()
@@ -102,8 +129,10 @@ pipeline {
         }
 
         stage('Push Docker Images') {
+            when {
+                expression { env.SKIP_CI_PIPELINE != 'true' }
+            }
             parallel {
-
                 stage('Push Main App Image') {
                     steps {
                         script {
@@ -131,6 +160,9 @@ pipeline {
         }
 
         stage('Update GitOps Repository') {
+            when {
+                expression { env.SKIP_CI_PIPELINE != 'true' }
+            }
             steps {
                 withCredentials([
                     usernamePassword(
