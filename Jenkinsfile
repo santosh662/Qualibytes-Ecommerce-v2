@@ -24,7 +24,7 @@ pipeline {
         stage('Cleanup Workspace') {
             steps {
                 script {
-[<0;31;38M                    clean_ws()
+                    clean_ws()
                 }
             }
         }
@@ -36,7 +36,7 @@ pipeline {
                         'https://github.com/santosh662/Qualibytes-Ecommerce-v2.git',
                         'dev'
                     )
-[<0;31;38m
+
                     def commitMessage = sh(
                         script: 'git log -1 --pretty=%s',
                         returnStdout: true
