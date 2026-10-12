@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: qbs-app
-          image: qualibytes-shop-app:local
+          image: mrsinghdev/qbshop-app:6
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
