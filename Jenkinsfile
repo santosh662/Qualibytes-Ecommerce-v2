@@ -128,17 +128,30 @@ pipeline {
             }
         }
         
-        stage('Update GitOps Repository') {
+       
+stage('Update GitOps Repository') {
     steps {
-        sh """
-        chmod +x automation/update-image-tag.sh
-        chmod +x automation/git-commit.sh
+        withCredentials([
+            usernamePassword(
+                credentialsId: 'github-credentials',
+                usernameVariable: 'GIT_USERNAME',
+                passwordVariable: 'GIT_PASSWORD'
+            )
+        ]) {
+            sh '''
+                set -eu
+                set +x
 
-        automation/update-image-tag.sh ${BUILD_NUMBER}
+                chmod +x automation/update-image-tag.sh
+                chmod +x automation/git-commit.sh
 
-        automation/git-commit.sh
-        """
+                automation/update-image-tag.sh "$BUILD_NUMBER"
+                automation/git-commit.sh
+            '''
+        }
     }
 }
-    }
+   
+         
+    
 }
